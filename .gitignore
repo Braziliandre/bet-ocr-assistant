@@ -1,0 +1,26 @@
+﻿# Python virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+bot_timing.log
+bot_log.log
+
+# Sensitive/private files
+telegram-ocr-connection-7eb1d30dee09.json
+credentials.json
+config.txt
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
