@@ -160,29 +160,14 @@ def TOCR():
 
     def generate_google_auth_url(user_id):
         """Generate authentication URL for Google OAuth"""
-        try:
-            # Get credentials from GCS
-            gcs_credentials, _ = download_from_gcs(root_bucket_name, "credentials.json")
-            creds_dict = json.loads(gcs_credentials)
-            
-            # Create flow
-            flow = InstalledAppFlow.from_client_config(
-                creds_dict,
-                SCOPES,
-                redirect_uri=os.environ.get('REDIRECT_URL', 'https://web-production-acba3.up.railway.app/oauth-callback')
-            )
-            
-            # Generate authorization URL with state parameter
-            auth_url, _ = flow.authorization_url(
-                access_type='offline',
-                include_granted_scopes='true',
-                state=str(user_id)
-            )
-            
-            return auth_url
-        except Exception as e:
-            logger.error(f"Error generating auth URL: {e}")
-            return None
+        # Get the redirect URL from environment or use default
+        redirect_url = os.environ.get('REDIRECT_URL', 'https://web-production-acba3.up.railway.app/oauth-callback')
+        
+        # Generate state parameter with user_id
+        state = str(user_id)
+        
+        # Return full auth URL with state
+        return f"{redirect_url}?state={state}"
     
     def check_if_authenticated(user_id):
         """Check if a user has already authenticated with Google"""
@@ -239,7 +224,7 @@ def TOCR():
                     logger.error(f"Token refresh failed for user {user_id}: {refresh_error}")
                     creds = None
                     
-                    # Handle invalid_grant error
+                    # Handle invalid_grant error by deleting the token
                     if 'invalid_grant' in str(refresh_error):
                         try:
                             delete_start = time.time()
@@ -251,43 +236,7 @@ def TOCR():
                                 logger.info(f"Invalid token deletion took {time.time() - delete_start:.2f} seconds")
                         except Exception as delete_error:
                             logger.error(f"Error deleting invalid token: {delete_error}")
-                        
-            # Handle authentication
-            if not creds:
-                try:
-                    auth_start = time.time()
-                    gcs_credentials, _ = download_from_gcs(root_bucket_name, "credentials.json")
-                    creds_dict = json.loads(gcs_credentials)
-                    flow = InstalledAppFlow.from_client_config(
-                        creds_dict, 
-                        SCOPES,
-                        redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Use manual copy-paste flow
-                    )
-                    
-                    # Get the authorization URL
-                    auth_url = flow.authorization_url()[0]
-                    logger.info(f"Opening auth URL: {auth_url}")
-                    
-                    # Run the authorization flow
-                    if os.environ.get('LOCAL_DEV', 'False').lower() == 'true':
-                        import webbrowser
-                        webbrowser.open(auth_url)
-                        code = input('Enter the authorization code: ')
-                    else:
-                        raise Exception("Please use local development for initial authentication")
-                    
-                    # Exchange the code for credentials
-                    flow.fetch_token(code=code)
-                    creds = flow.credentials
-                    
-                    # Save new credentials
-                    upload_to_gcs(root_bucket_name, gcs_file_path, creds.to_json())
-                    logger.info(f"Authentication flow took {time.time() - auth_start:.2f} seconds")
-                    
-                except Exception as auth_error:
-                    logger.error(f"Authentication flow failed: {auth_error}")
-                    return None
-                    
+            
             logger.info(f'Credential validation and refresh took {time.time() - validation_start:.2f} seconds')
 
         total_time = time.time() - start_time
